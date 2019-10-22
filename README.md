@@ -29,18 +29,18 @@ Three simple commands from your host should be all that is needed to get started
 ### Quickstart
 To get started quickly, follow the following three steps:
 
-Clone this repository on your Docker host, cd into `dockprom` directory and run `compose up`:
+Clone this repository on your Docker host, cd into `dockprom` directory and run `docker-compose up`:
 
 ```
 git clone https://github.com/sdcote/dockprom
 cd dockprom
 docker-compose up -d
 ```
-For new installs, Docker will start downloading the container images for the products listed above. These are currently being taken from DockerHub but in the future, these images will probably be official AEP images vetted by our security and operations teams.  
+For new installs, Docker will start downloading the container images for the products listed above.  
 
 This will get everything installed using the default usernames and passwords. _**Only use this for testing and experimentation**_
 
-The Grafana system has its own user management system is listening on port 3000. The default administration credentials are for Grafana are `admin:changeme`. To access the Prometheus time series database (port 9090) and the Prometheus AlertManager (port 9093) you will need to authenticate with a reverse proxy. The default credentials for these two components are `admin:changeme`. The Prometheus Push Gateway is also protected with a reverse proxy, but with a different set of credentials, the defaults are `metrics:monitor`. 
+The Grafana system has its own user management system and is listening on port 3000. The default administration credentials are for Grafana are `admin:changeme`. To access the Prometheus time series database (port 9090) and the Prometheus AlertManager (port 9093) you will need to authenticate with a reverse proxy. The default credentials for these two components are `admin:changeme`. The Prometheus Push Gateway is also protected with a reverse proxy, but with a different set of credentials, the defaults are `metrics:monitor`. 
 
 ### Real Start
 
@@ -53,8 +53,6 @@ _**Security Notice**_ it is highly recommended that you choose appropriate passw
 
 ### Initial Login
 Navigate to `http://<host-ip>:3000` and login with user ***admin*** password ***admin***. You will be encouraged to change the admin password. You **should** do this.
-
-When the system is restarted (`docker-compose up`), the credentials will be reset back to the defaults in the `docker-compose.yml` file. It is recommended to stop and start the containers as required and avoid completely resetting the system with `docker-compose down` as it will remove all resources but for the data volumes. All users will be lost.
 
 ### Add other users
 
@@ -70,8 +68,7 @@ For a DevOps team, you will probably only need a "viewer" account. This can be a
 1. Press the invite button.
 1. Select the "Pending Invites (#)" tab on the users screen.
 1. Select the "Copy Invite" link to copy the activation link for that user to the clipboard.
-1. Open another tab in your browser and paste the link to your address panel. Make sure to replace `localhost` with the hostname of the docker host.
-1. Complete the user registration process.
+1. Replace `localhost` with the hostname of the docker host and manually email the link to your teammate. They can use the link to complete the registration process. Alternately, you can navigate to the link yourself and register the account for them. They can change their credentials later. 
 
 You can repeat this process for as many users as you need. Keep in mind this is just for your team and you probably only need two or three accounts in your DevOps monitor.
 
@@ -81,7 +78,6 @@ Grafana is preconfigured with dashboards and Prometheus as the default data sour
 * Type: Prometheus
 * Url: http://prometheus:9090
 * Access: proxy
-
 
 ***Docker Host Dashboard***
 
@@ -277,10 +273,15 @@ receivers:
 
 ## Sending metrics to the Pushgateway
 
-The [pushgateway](https://github.com/prometheus/pushgateway) is used to collect data from batch jobs or from services.
+The [pushgateway](https://github.com/prometheus/pushgateway) is used to collect data from batch jobs or from other ephemeral services.
 
-To push data, simply execute:
+All that is required to push data is posting a bit of text with a metric name and a value. For example, you can use a single line of shell code to publish `some_metric` with a value of `3.14`:
+```
+echo "some_metric 3.14" | curl --data-binary @- http://user:password@localhost:9091/metrics/job/some_job
+```
+Please replace the `user:password` part with your user and password set in the initial configuration (default: `metrics:monitor`).
 
-    echo "some_metric 3.14" | curl --data-binary @- http://user:password@localhost:9091/metrics/job/some_job
+# Summary
+This is a simple starting point for teams to begin collecting DevOps metrics, and displaying them on real-time dashboards.
 
-Please replace the `user:password` part with your user and password set in the initial configuration (default: `admin:changeme`).
+As the value of using real time metrics to monitor the development processes and value delivery stream becomes integral to your team's success, this starting point can be evolved into a more robust "Information and Reporting" strategy 

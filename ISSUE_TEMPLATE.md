@@ -18,7 +18,7 @@ Provide a link to a live example, or steps to reproduce this bug. Include code t
 4.
 
 ## Your Environment
-Include as many relevant details about the environment you experienced the bug in
+Include as many relevant details about the environment in which you experienced the bug:
 * Docker version `docker version` (e.g. Docker 17.0.05 ):
 
 * Operating System and version (e.g. Linux, Windows, MacOS):
