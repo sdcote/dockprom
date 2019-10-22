@@ -1,3 +1,10 @@
+# Support for Unix
+This project is currently supporting Docker for Windows.  To use this in Unix environments (including MacOS) the `docker-compose.yml` file only needs a couple of changes.
+1. In the `nodeexporter` section the volume mapping of `- c:\:/rootfs:ro` should be changed to `- /:/rootfs:ro` 
+1. Similarly, the `cadvisor` section volume mapping of `- c:\:/rootfs:ro` should be changed to `- /:/rootfs:ro` on Unix configurations.
+
+The above are the only two changed needed to run this on a Unix system.
+
 # Problems with Volumes
 1. Go into the Docker toolkit, under settings.Shared drives and make sure the drive on which the volumes are specified are set to shared. 
     - If they are and it is still does not work, try "Reset Credentials" and reshare the drive entering in your credentials.

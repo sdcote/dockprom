@@ -5,11 +5,9 @@ If you're suggesting a change/improvement, tell us how it should work
 
 ## Expected Behaviour
 
-
 ## Current Behaviour
 
 ## Possible Solution
-
 
 ## Steps to Reproduce (for bugs)
 Provide a link to a live example, or steps to reproduce this bug. Include code to reproduce, if relevant:
