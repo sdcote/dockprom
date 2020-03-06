@@ -73,9 +73,9 @@ This leaves us with the case where the metrics pushed to the Pushgateway do not 
 
 ### About timestamps
 
-If you push metrics at time *t*<sub>1</sub>, you might be tempted to believe that Prometheus will scrape them with that same timestamp *t*<sub>1</sub>. Instead, what Prometheus attaches as a timestamp is the timewhen it scrapes the Pushgateway.
+If you push metrics at time *t*<sub>1</sub>, you might be tempted to believe that Prometheus will scrape them with that same timestamp *t*<sub>1</sub>. Instead, what Prometheus attaches as a timestamp is the timewhen it scrapes the Pushgateway. Why so?
 
-With Prometheus, a metric can be scraped at any time. A metric that cannot be scraped has basically ceased to exist. Prometheus is somewhat tolerant, but if it cannot get any samples for a metric in 5 minutes, it will behave as if that metric does not exist anymore. Preventing that is one of the reasons to use a Pushgateway. The Pushgateway will make the metrics of your ephemeral job "scrapable" at any time. Attaching the time of pushing as a timestamp would defeat that purpose because 5 minutes after the last push, your metric will look as stale to Prometheus as if it could not be scraped at all anymore. (Prometheus knows only one timestamp per sample, there is no way to distinguish a 'time of pushing' and a 'timeof scraping'.)
+In the world view of Prometheus, a metric can be scraped at any time. A metric that cannot be scraped has basically ceased to exist. Prometheus is somewhat tolerant, but if it cannot get any samples for a metric in 5min, it will behave as if that metric does not exist anymore. Preventing that is actually one of the reasons to use a Pushgateway. The Pushgateway will make the metrics of your ephemeral job scrapable at any time. Attaching the time of pushing as a timestamp would defeat that purpose because 5min after the last push, your metric will look as stale to Prometheus as if it could not be scraped at all anymore. (Prometheus knows only one timestamp per sample, there is no way to distinguish a 'time of pushing' and a 'timeof scraping'.)
 
 As there aren't any use cases where it would make sense to to attach a different timestamp, and many users attempting to incorrectly do so (despite no client library supporting this), the Pushgateway rejects any pushes with timestamps.
 
@@ -93,65 +93,117 @@ The default port the push gateway is listening to is 9091. The path looks like
 
     /metrics/job/<JOB_NAME>{/<LABEL_NAME>/<LABEL_VALUE>}
 
-`<JOB_NAME>` is used as the value of the `job` label, followed by any number of other label pairs (which might or might not include an `instance` label). The label set defined by the URL path is used as a grouping key. Any of those labels already set in the body of the request (as regular labels, e.g. `name{job="foo"} 42`) _will be overwritten to match the labels defined by the URL path!_
+`<JOB_NAME>` is used as the value of the `job` label, followed by any
+number of other label pairs (which might or might not include an
+`instance` label). The label set defined by the URL path is used as a
+grouping key. Any of those labels already set in the body of the
+request (as regular labels, e.g. `name{job="foo"} 42`)
+_will be overwritten to match the labels defined by the URL path!_
 
-If `job` or any label name is suffixed with `@base64`, the following job name or label value is interpreted as a base64 encoded string according to [RFC 4648, using the URL and filename safe alphabet](https://tools.ietf.org/html/rfc4648#section-5). (Padding is optional.) This is the only way of using job names or label values that contain a `/`. For other special characters, the usual URI component encoding works, too, but the base64 might be more convenient.
+If `job` or any label name is suffixed with `@base64`, the following job name
+or label value is interpreted as a base64 encoded string according to [RFC
+4648, using the URL and filename safe
+alphabet](https://tools.ietf.org/html/rfc4648#section-5). (Padding is
+optional.) This is the only way of using job names or label values that contain
+a `/`. For other special characters, the usual URI component encoding works,
+too, but the base64 might be more convenient.
 
 Ideally, client libraries take care of the suffixing and encoding.
 
 Examples:
 
-* To use the grouping key `job="directory_cleaner",path="/var/tmp"`, the following path will _not_ work:
+* To use the grouping key `job="directory_cleaner",path="/var/tmp"`, the
+  following path will _not_ work:
 
 	  /metrics/job/directory_cleaner/path//var/tmp
 	  
-Instead, use the base64 URL-safe encoding for the label value and mark it by suffixing the label name with `@base64`:
+  Instead, use the base64 URL-safe encoding for the label value and mark it by
+  suffixing the label name with `@base64`:
   
   	  /metrics/job/directory_cleaner/path@base64/L3Zhci90bXA
 	  
-If you are not using a client library that handles the encoding for you, you can use encoding tools. For example, there is a command line tool `base64url` (Debian package `basez`), which you could combine with `curl` to push from the command line in the following way:
+  If you are not using a client library that handles the encoding for you, you
+  can use encoding tools. For example, there is a command line tool `base64url`
+  (Debian package `basez`), which you could combine with `curl` to push from
+  the command line in the following way:
   
       echo 'some_metric{foo="bar"} 3.14' | curl --data-binary @- http://pushgateway.example.org:9091/metrics/job/directory_cleaner/path@base64/$(echo -n '/var/tmp' | base64url)
   
-The grouping key `job="titan",name="Προμηθεύς"` can be represented “traditionally” with URI encoding:
+* The grouping key `job="titan",name="Προμηθεύς"` can be represented
+  “traditionally” with URI encoding:
   
       /metrics/job/titan/name/%CE%A0%CF%81%CE%BF%CE%BC%CE%B7%CE%B8%CE%B5%CF%8D%CF%82
 	  
-Or you can use the more compact base64 encoding:
+  Or you can use the more compact base64 encoding:
   
       /metrics/job/titan/name@base64/zqDPgc6_zrzOt864zrXPjc-C
 
 ### `PUT` method
 
-`PUT` is used to push a group of metrics. All metrics with the grouping key specified in the URL are replaced by the metrics pushed with `PUT`.
+`PUT` is used to push a group of metrics. All metrics with the
+grouping key specified in the URL are replaced by the metrics pushed
+with `PUT`.
 
-The body of the request contains the metrics to push either as delimited binary protocol buffers or in the simple flat text format (both in version 0.0.4, see the [data exposition format specification](https://docs.google.com/document/d/1ZjyKiKxZV83VI9ZKAXRGKaUKK2BIWCT7oiGBKDBpjEY/edit?usp=sharing)). Discrimination between the two variants is done via the `Content-Type` header. (Use the value `application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=delimited` for protocol buffers, otherwise the text format is tried as a fall-back.)
+The body of the request contains the metrics to push either as delimited binary
+protocol buffers or in the simple flat text format (both in version 0.0.4, see
+the
+[data exposition format specification](https://docs.google.com/document/d/1ZjyKiKxZV83VI9ZKAXRGKaUKK2BIWCT7oiGBKDBpjEY/edit?usp=sharing)).
+Discrimination between the two variants is done via the `Content-Type`
+header. (Use the value `application/vnd.google.protobuf;
+proto=io.prometheus.client.MetricFamily; encoding=delimited` for protocol
+buffers, otherwise the text format is tried as a fall-back.)
 
-The response code upon success is always 202 (even if the same grouping key has never been used before, i.e. there is no feedback to the client if the push has replaced an existing group of metrics or created a new one).
+The response code upon success is always 202 (even if the same
+grouping key has never been used before, i.e. there is no feedback to
+the client if the push has replaced an existing group of metrics or
+created a new one).
 
-_If using the protobuf format, do not send duplicate MetricFamily proto messages (i.e. more than one with the same name) in one push, as they will overwrite each other._
+_If using the protobuf format, do not send duplicate MetricFamily
+proto messages (i.e. more than one with the same name) in one push, as
+they will overwrite each other._
 
-A successfully finished request means that the pushed metrics are queued for an update of the storage. Scraping the push gateway may still yield the old results until the queued update is processed. Neither is there a guarantee that the pushed metrics are persisted to disk. (A server crash may cause data loss. Or the push gateway is configured to not persist to disk at all.)
+A successfully finished request means that the pushed metrics are
+queued for an update of the storage. Scraping the push gateway may
+still yield the old results until the queued update is
+processed. Neither is there a guarantee that the pushed metrics are
+persisted to disk. (A server crash may cause data loss. Or the push
+gateway is configured to not persist to disk at all.)
 
-A `PUT` request with an empty body effectively deletes all metrics with the specified grouping key. However, in contrast to the [`DELETE` request](#delete-method) described below, it does update the `push_time_seconds` metrics.
+A `PUT` request with an empty body effectively deletes all metrics with the
+specified grouping key. However, in contrast to the
+[`DELETE` request](#delete-method) described below, it does update the
+`push_time_seconds` metrics.
 
 ### `POST` method
 
-`POST` works exactly like the `PUT` method but only metrics with the same name as the newly pushed metrics are replaced (among those with the same grouping key). 
+`POST` works exactly like the `PUT` method but only metrics with the
+same name as the newly pushed metrics are replaced (among those with
+the same grouping key).
 
-A `POST` request with an empty body merely updates the `push_time_seconds` metrics but does not change any of the previously pushed metrics.
+A `POST` request with an empty body merely updates the `push_time_seconds`
+metrics but does not change any of the previously pushed metrics.
 
 ### `DELETE` method
 
-`DELETE` is used to delete metrics from the push gateway. The request must not contain any content. All metrics with the grouping key specified in the URL are deleted.
+`DELETE` is used to delete metrics from the push gateway. The request
+must not contain any content. All metrics with the grouping key
+specified in the URL are deleted.
 
-The response code upon success is always 202. The delete request is merely queued at that moment. There is no guarantee that the request will actually be executed or that the result will make it to the persistence layer (e.g. in case of a server crash). However, the order of `PUT`/`POST` and `DELETE` request is guaranteed, i.e. if you have successfully sent a `DELETE` request and then send a `PUT`, it is guaranteed that the `DELETE` will be processed first (and vice versa).
+The response code upon success is always 202. The delete
+request is merely queued at that moment. There is no guarantee that the
+request will actually be executed or that the result will make it to
+the persistence layer (e.g. in case of a server crash). However, the
+order of `PUT`/`POST` and `DELETE` request is guaranteed, i.e. if you
+have successfully sent a `DELETE` request and then send a `PUT`, it is
+guaranteed that the `DELETE` will be processed first (and vice versa).
 
-Deleting a grouping key without metrics is a no-op and will not result in an error.
+Deleting a grouping key without metrics is a no-op and will not result
+in an error.
 
 ## Exposed metrics
 
-The Pushgateway exposes the following metrics via the configured `--web.telemetry-path` (default: `/metrics`):
+The Pushgateway exposes the following metrics via the configured
+`--web.telemetry-path` (default: `/metrics`):
 - The pushed metrics.
 - For earch pushed group, a metric `push_time_seconds` as explained above.
 - The usual metrics provided by the [Prometheus Go client library](https://github.com/prometheus/client_golang), i.e.:
@@ -185,5 +237,6 @@ pushgateway_http_requests_total{code="200",handler="status",method="get"} 8
 pushgateway_http_requests_total{code="202",handler="delete",method="delete"} 1
 pushgateway_http_requests_total{code="202",handler="push",method="post"} 6
 pushgateway_http_requests_total{code="400",handler="push",method="post"} 2
+
 ```
   

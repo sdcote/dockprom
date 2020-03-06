@@ -40,7 +40,7 @@ For new installs, Docker will start downloading the container images for the pro
 
 This will get everything installed using the default usernames and passwords. _**Only use this for testing and experimentation**_
 
-The Grafana system has its own user management system and is listening on port 3000. The default administration credentials are for Grafana are `admin:changeme`. To access the Prometheus time series database (port 9090) and the Prometheus AlertManager (port 9093) you will need to authenticate with a reverse proxy. The default credentials for these two components are `admin:changeme`. The Prometheus Push Gateway is also protected with a reverse proxy, but with a different set of credentials, the defaults are `metrics:monitor`. 
+The Grafana system has its own user management system is listening on port 3000. The default administration credentials are for Grafana are `admin:changeme`. To access the Prometheus time series database (port 9090) and the Prometheus AlertManager (port 9093) you will need to authenticate with a reverse proxy. The default credentials for these two components are `admin:changeme`. The Prometheus Push Gateway is also protected with a reverse proxy, but with a different set of credentials, the defaults are `metrics:monitor`. 
 
 ### Real Start
 
@@ -48,6 +48,20 @@ You don't want to accept the default usernames and passwords when you implement 
 
 _**Security Notice**_ it is highly recommended that you choose appropriate passwords for the proxy user above. It will be the primary credentials used to access your time series database, push gateway and alert manager. If you want to push metrics to the `PushGateway`, you will have to provide a username and password to the reverse proxy using basic authentication. Do not use the defaults and strongly consider keeping the PUSH credentials different from any of the others. Remote monitors will be using these credentials to access your monitoring system and poor configuration on their part could expose the administration capabilities of your system.
 
+## Configuration
+
+Being a containerized solution, configuration is handled by creating a new image with the proper configuration and running the new image. Therefore, to change the configurations of any component, modify the configuration files in this project and re-run the containers. The following are the primary configuration files:
+
+* Prometheus - `prometheus/prometheus.yml`
+* Prometheus Alerts - `prometheus/alert.rules`
+* AlertManager - `alertmanager\config.yml`
+* Caddy - `caddy/Caddyfile`
+* Grafana Datasource - `grafana/datasources/Prometheus.json`
+* Grafana Dashboards - `grafana/dashboards/` - JSON file per dashboard to install
+
+To reconfigure the solution, call `docker-compose down` from this directory, change the configuration files as required then run `docker-compose up -d` to rebuild the images and run the containers.
+
+The Prometheus data is persisted in a volume and will not be lost between runs.
 
 ## Setup Grafana
 
@@ -72,8 +86,12 @@ For a DevOps team, you will probably only need a "viewer" account. This can be a
 
 You can repeat this process for as many users as you need. Keep in mind this is just for your team and you probably only need two or three accounts in your DevOps monitor.
 
-## Dashboards
-Grafana is preconfigured with dashboards and Prometheus as the default data source:
+## Datasources and Dashboards
+Grafana version 5.0.0 has introduced the concept of provisioning. This allows us to automate the process of adding Datasources & Dashboards. The /grafana/provisioning/ directory contains the datasources and dashboards directories. These directories contain YAML files which allow us to specify which datasource or dashboards should be installed.
+             
+If you would like to automate the installation of additional dashboards just copy the Dashboard JSON file to /grafana/provisioning/dashboards and it will be provisioned next time you stop and start Grafana.
+
+This Grafana configuration is preconfigured with dashboards and Prometheus as the default data source:
 * Name: Prometheus
 * Type: Prometheus
 * Url: http://prometheus:9090

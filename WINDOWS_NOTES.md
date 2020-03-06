@@ -28,4 +28,3 @@ with
 volumes:
   - c:\:/rootfs:ro
 ```
-
